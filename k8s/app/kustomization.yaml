@@ -1,0 +1,13 @@
+# Everything Argo CD deploys for the ProductApi. The pipeline only changes "newTag" below.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: productapi
+
+resources:
+  - postgres.yaml
+  - api.yaml
+
+images:
+  - name: ghcr.io/mas-devtools/devops-webapi
+    newTag: sha-5d0f8de

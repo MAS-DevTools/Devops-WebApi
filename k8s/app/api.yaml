@@ -1,0 +1,83 @@
+# The ProductApi: 2 replicas with a rolling update, so a new version goes live without downtime.
+apiVersion: v1
+kind: Service
+metadata:
+  name: productapi
+  labels:
+    app: productapi
+spec:
+  # Docker Desktop exposes LoadBalancer services on localhost: http://localhost:8090
+  type: LoadBalancer
+  selector:
+    app: productapi
+  ports:
+    - name: http
+      port: 8090
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: productapi
+  labels:
+    app: productapi
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: productapi
+  template:
+    metadata:
+      labels:
+        app: productapi
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      # Wait until PostgreSQL accepts connections; the API creates its schema on start-up.
+      initContainers:
+        - name: wait-for-database
+          image: postgres:17-alpine
+          command: ["sh", "-c", "until pg_isready -h postgres -p 5432; do echo waiting for database; sleep 2; done"]
+          securityContext:
+            runAsUser: 70
+            allowPrivilegeEscalation: false
+      containers:
+        - name: productapi
+          # The tag is set by kustomization.yaml (newTag), which the pipeline updates per commit.
+          image: ghcr.io/mas-devtools/devops-webapi
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ConnectionStrings__ProductDb
+              valueFrom:
+                secretKeyRef:
+                  name: productapi-database
+                  key: connection-string
+          securityContext:
+            allowPrivilegeEscalation: false
+          # Readiness includes the database check: no traffic until the pod can serve requests.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          # Liveness only checks the process itself, so a database outage does not restart every API pod.
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

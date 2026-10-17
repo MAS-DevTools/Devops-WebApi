@@ -1,0 +1,19 @@
+# Tells Argo CD to keep the cluster in sync with k8s/app on the main branch (GitOps, pull-based).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: productapi
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/MAS-DevTools/Devops-WebApi.git
+    targetRevision: main
+    path: k8s/app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: productapi
+  syncPolicy:
+    automated:
+      prune: true     # remove resources that were deleted from Git
+      selfHeal: true  # undo manual changes in the cluster
