@@ -10,4 +10,4 @@ resources:
 
 images:
   - name: ghcr.io/mas-devtools/devops-webapi
-    newTag: sha-5d0f8de
+    newTag: sha-53fce5e
